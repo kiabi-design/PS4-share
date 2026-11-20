@@ -54,14 +54,17 @@ jobs:
           set -euo pipefail
           cd ps4_fastdrop
 
-          clang -target x86_64-scei-freebsd \
+          TOOLCHAIN_BIN="$OO_PS4_TOOLCHAIN/bin/linux/x86_64"
+          export PATH="$TOOLCHAIN_BIN:$PATH"
+
+          "$TOOLCHAIN_BIN/clang" -target x86_64-scei-freebsd \
             -isysroot "$OO_PS4_TOOLCHAIN" \
             -isystem "$OO_PS4_TOOLCHAIN/include" \
             -I"$OO_PS4_TOOLCHAIN/include/orbis" \
             -O2 -Wall -Wextra \
             -c source/main.c -o build/main.o
 
-          ld.lld -target x86_64-scei-freebsd \
+          "$TOOLCHAIN_BIN/ld.lld" -target x86_64-scei-freebsd \
             --sysroot="$OO_PS4_TOOLCHAIN" \
             -L"$OO_PS4_TOOLCHAIN/lib" \
             -lSceSysmodule -lSceUserService -lScePad -lc -lkernel \
