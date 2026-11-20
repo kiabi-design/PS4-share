@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p /opt/openorbis
+
+python3 - << 'PYEOF'
+import json, urllib.request
+
+url = "https://api.github.com/repos/OpenOrbis/OpenOrbis-PS4-Toolchain/releases"
+req = urllib.request.Request(url, headers={"User-Agent": "github-actions"})
+with urllib.request.urlopen(req, timeout=30) as resp:
+    releases = json.loads(resp.read().decode("utf-8"))
+
+exts = (".zip", ".tar.gz", ".tgz", ".tar.xz", ".7z")
+chosen = None
+all_assets = []
+
+for rel in releases:
+    for a in rel.get("assets", []):
+        name = a.get("name", "")
+        dl = a.get("browser_download_url", "")
+        all_assets.append(f"{rel.get('tag_name')}: {name}")
+        if name.lower().endswith(exts) and dl:
+            chosen = (name, dl)
+            break
+    if chosen:
+        break
+
+with open("/tmp/toolchain_asset.env", "w", encoding="utf-8") as f:
+    if chosen:
+        f.write(f"ASSET_NAME={chosen[0]}\nASSET_URL={chosen[1]}\n")
+    else:
+        print("No archive asset found in releases. Available assets:")
+        for item in all_assets[:30]:
+            print(" -", item)
+        raise SystemExit(1)
+PYEOF
+
+source /tmp/toolchain_asset.env
+echo "Downloading $ASSET_NAME ..."
+curl -fsSL "$ASSET_URL" -o "/tmp/$ASSET_NAME"
+
+case "$ASSET_NAME" in
+  *.zip) unzip -q "/tmp/$ASSET_NAME" -d /opt/openorbis ;;
+  *.tar.gz|*.tgz) tar -xzf "/tmp/$ASSET_NAME" -C /opt/openorbis ;;
+  *.tar.xz) tar -xf "/tmp/$ASSET_NAME" -C /opt/openorbis ;;
+  *.7z)
+    sudo apt-get install -y --no-install-recommends p7zip-full
+    7z x "/tmp/$ASSET_NAME" -o/opt/openorbis -y >/dev/null
+    ;;
+esac
+
+TOOLCHAIN_DIR="$(find /opt/openorbis -maxdepth 3 -type d -name "include" -printf '%h\n' | head -n 1)"
+if [ -z "$TOOLCHAIN_DIR" ]; then
+  TOOLCHAIN_DIR="/opt/openorbis"
+fi
+
+echo "OO_PS4_TOOLCHAIN=$TOOLCHAIN_DIR" >> "$GITHUB_ENV"
+echo "$TOOLCHAIN_DIR/bin/linux/x86_64" >> "$GITHUB_PATH"
