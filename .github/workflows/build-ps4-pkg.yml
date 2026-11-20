@@ -24,7 +24,10 @@ jobs:
             python3-pil \
             unzip \
             curl \
-            ca-certificates
+            ca-certificates \
+            wine64 \
+            wine32 \
+            winbind
 
       - name: Setup OpenOrbis PS4 Toolchain
         run: |
@@ -88,25 +91,19 @@ jobs:
 
           create-fself -in "$SELF_INPUT" --out build/FastDropPS4.debug.oelf --eboot pkg_dir/eboot.bin
 
-      - name: Build param.sfo and pack PS4 PKG
+      - name: Build param.sfo and pack PS4 PKG (via Wine + orbis-pub-cmd)
         run: |
           set -euo pipefail
           cd ps4_fastdrop
 
-          PKG_TOOL="$(command -v create-pkg || find /opt/openorbis -name 'create-pkg*' -type f | head -n 1 || true)"
-          SFO_TOOL="$(command -v pkg_sfo || command -v create-sfo || find /opt/openorbis -name '*sfo*' -type f | head -n 1 || true)"
+          # Create param.sfo using orbis-pub-sfo.exe via Wine
+          wine ../../tools/orbis-pub/orbis-pub-sfo.exe --title "FastDrop PS4" --title-id "FSDROP001" -s APP_TYPE=full -s CATEGORY=ac -o pkg_dir/sce_sys/param.sfo
 
-          if [ -z "$PKG_TOOL" ]; then
-            echo "PKG builder binary not found in OpenOrbis toolchain."
-            ls -laR "$OO_PS4_TOOLCHAIN/bin" || true
-            exit 1
-          fi
+          # Generate GP4 project using gengp4_app.exe via Wine
+          wine ../../tools/orbis-pub/gengp4_app.exe pkg_dir FastDropPS4.gp4
 
-          if [ -n "$SFO_TOOL" ] && [ ! -f pkg_dir/sce_sys/param.sfo ]; then
-            "$SFO_TOOL" --title "FastDrop PS4" --title-id "FSDROP001" -s APP_TYPE=full -s CATEGORY=ac -o pkg_dir/sce_sys/param.sfo || true
-          fi
-
-          "$PKG_TOOL" --out FastDropPS4_stub.pkg FastDropPS4.gp4
+          # Build PKG using orbis-pub-cmd.exe via Wine
+          wine ../../tools/orbis-pub/orbis-pub-cmd.exe create_pkg --gp4 FastDropPS4.gp4 --output FastDropPS4_stub.pkg
 
       - name: Upload PS4 PKG artifact
         uses: actions/upload-artifact@v4
