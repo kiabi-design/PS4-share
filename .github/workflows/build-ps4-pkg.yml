@@ -26,7 +26,6 @@ jobs:
             curl \
             ca-certificates \
             wine64 \
-            wine32 \
             winbind
 
       - name: Setup OpenOrbis PS4 Toolchain
