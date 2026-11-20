@@ -54,8 +54,17 @@ jobs:
           set -euo pipefail
           cd ps4_fastdrop
 
-          TOOLCHAIN_BIN="$OO_PS4_TOOLCHAIN/bin/linux/x86_64"
+          # Find toolchain binaries (structure varies)
+          TOOLCHAIN_BIN="$(find "$OO_PS4_TOOLCHAIN" -name 'clang' -type f | head -n 1 | xargs dirname)"
+          if [ -z "$TOOLCHAIN_BIN" ]; then
+            echo "clang not found in toolchain"
+            find "$OO_PS4_TOOLCHAIN" -type f -name 'clang' -o -name 'ld.lld' -o -name 'create-fself' | head -20
+            exit 1
+          fi
           export PATH="$TOOLCHAIN_BIN:$PATH"
+
+          echo "Using toolchain bin: $TOOLCHAIN_BIN"
+          ls -la "$TOOLCHAIN_BIN/"
 
           "$TOOLCHAIN_BIN/clang" -target x86_64-scei-freebsd \
             -isysroot "$OO_PS4_TOOLCHAIN" \
